@@ -30,13 +30,13 @@ twitter_username: aidnzz
 github_username:  aidnzz
 
 # Build settings
-remote_theme: jekyll/minima
-# theme: minima
+# remote_theme: jekyll/minima
+theme: minima
 plugins:
   - jekyll-feed
-
-minima:
-    skin: dark
+#
+# minima:
+#    skin: dark
 
 # Exclude from processing.
 # The following items will not be processed, by default.
