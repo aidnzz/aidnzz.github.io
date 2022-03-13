@@ -26,7 +26,6 @@ baseurl: "" # the subpath of your site, e.g. /blog
 url: "aidn.pro" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: aidnzz
 github_username:  aidnzz
-youtube_username: UCYvXIeWYhoEFUuNroOtioLw
 
 # Build settings
 
