@@ -58,7 +58,7 @@ To successfully exploit this binary, we need to leverage the format string vulne
 
 # Bruteforcing the random number {#brute-forcing}
 
-`(get_random() % 4096) + 1` gives the solutions a range from -4095 to +4097 a total range of 8192 solutions however we can narrow this down. Firstly, as the function address is coerced to a signed 32-bit integer we know that this integer will be negative as libc is usually based at a high address. Secondly, the addresses of the libc functions always seem to be 16 byte aligned meaning that they go up in increments of 16, massively reducing the range to 256 possible values.
+`(get_random() % 4096) + 1` gives the solutions a range from -4095 to +4097 a total of 8192 solutions however we can narrow this down. Firstly, as the function address is coerced to a signed 32-bit integer we know that this integer will be negative as libc is usually based at a high address. Secondly, the addresses of the libc functions always seem to be 16 byte aligned meaning that they go up in increments of 16, massively reducing the range to 256 possible values.
 
 ```python
 solutions = range(1, -4095, -16)
