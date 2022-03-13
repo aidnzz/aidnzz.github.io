@@ -27,14 +27,15 @@ url: "aidn.pro" # the base hostname & protocol for your site, e.g. http://exampl
 twitter_username: aidnzz
 github_username:  aidnzz
 
+
 # Build settings
-# remote_theme: jekyll/minima
 
 encoding: UTF-8
 theme: minima
 plugins:
   - jekyll-feed
-#
+
+# One day
 # minima:
 #    skin: dark
 

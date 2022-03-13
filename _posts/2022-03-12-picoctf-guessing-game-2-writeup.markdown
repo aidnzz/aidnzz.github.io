@@ -134,13 +134,13 @@ def create_rop_chain(stack_cookie: int, stager: BinaryIO) -> bytes:
 
 #### Finding the libc version on the server
 
-Now that we are able to run our stager we'll pass it `%.4s` as the first argument for the format string and then recieve the GOT entry for `gets`. The stager will send us a 4 byte string containing the address which can be converted to something useable using `int.from_bytes` in python. Now that we have the addresses we can use a [libc database](https://libc.blukat.me/) to find the libc version running on the server so that we can get the offsets of functions in that libc binary. Using this I found the libc version to be `libc6-i386_2.27-3ubuntu1.4_amd64.so`. Thankfully, the libc database search provides us with offsets to useful functions. For the final input to the stager we can send it `/bin/sh` to write to the data section for us to pass it to system and get a shell.
+Now that we are able to run our stager we'll pass it `%.4s` as the first argument for the format string and then recieve the GOT entry for `gets`. The stager will send us a 4 byte string containing the address which can be converted to something useable using `int.from_bytes` in python. Now that we have the addresses we can use a [libc database](https://libc.blukat.me/) to find the libc version running on the server so that we can get the offsets of functions in that libc binary. Using this I found the libc version to be `libc6-i386_2.27-3ubuntu1.4_amd64.so`. Thankfully, the libc database search provides us with offsets to useful functions. For the final input to the stager we can send it `/bin/sh` to write to the data section for us to pass it to `system` and get a shell.
 
 ![libc database search](/assets/images/libc_database_search.png)
 
 # Popping a shell
 
-Subtracting the GOT entry to `gets` from the offset of `gets` in the libc binary we can find the base address for libc. Using this we can contruct the final ROP chain and call system with the binary path being a pointer to the data section with the `/bin/sh` string we just wrote using the stager.
+Subtracting the GOT entry to `gets` from the offset of `gets` in the libc binary we can find the base address for libc. Using this we can contruct the final ROP chain and call `system` with the binary path being a pointer to the data section with the `/bin/sh` string we just wrote using the stager.
 
 ```python
 exploit =  p32(libc + LIBC_SYSTEM_OFFSET)   # system
