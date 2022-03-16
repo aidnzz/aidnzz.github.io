@@ -52,9 +52,9 @@ The program contains two critical vulnerabilities, a buffer overflow abetted by 
     PIE:      No PIE (0x8048000)
 ```
 
-As you can see, the binary is hardened with [RELRO](https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro) preventing us from leveraging the format string vulnerability to overwrite the Global Offset Table ([GOT](https://en.wikipedia.org/wiki/Global_Offset_Table)). [DEP](https://en.wikipedia.org/wiki/Executable_space_protection), meaning that we cannot use the buffer overflow vulnerability to jump to the stack. Even if the stack was executable we would still be unable to achieve code execution due to the presence of a [stack canary](https://en.wikipedia.org/wiki/Buffer_overflow_protection#Random_canaries). 
+As you can see, the binary is hardened with [RELRO](https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro), preventing us from leveraging the format string vulnerability to overwrite the Global Offset Table ([GOT](https://en.wikipedia.org/wiki/Global_Offset_Table)). [DEP](https://en.wikipedia.org/wiki/Executable_space_protection), meaning that we cannot use the buffer overflow vulnerability to jump to the stack. Even if the stack was executable we would still be unable to achieve code execution due to the presence of a [stack canary](https://en.wikipedia.org/wiki/Buffer_overflow_protection#Random_canaries). 
 
-To successfully exploit this binary, we need to leverage the format string vulnerability to leak the stack cookie and use it in the buffer-overflow vulnerability to allow code execution via a ROP chain. First things first, we need to *guess* the *random* number.
+To successfully exploit this binary, we need to leverage the format string vulnerability to leak the stack cookie and use it in the buffer-overflow vulnerability to allow for code execution via a ROP chain. First things first, we need to *guess* the *random* number.
 
 # Bruteforcing the random number {#brute-forcing}
 
@@ -140,7 +140,7 @@ Now that we are able to run our stager we'll pass it `%.4s` as the first argumen
 
 # Popping a shell
 
-Subtracting the GOT entry to `gets` from the offset of `gets` in the libc binary we can find the base address for libc. Using this we can contruct the final ROP chain and call `system` with the binary path being a pointer to the data section with the `/bin/sh` string we just wrote using the stager.
+Subtracting the GOT entry to `gets` from the offset of `gets` in the libc binary we can find the base address for libc. Using this we can construct the final ROP chain and call `system` with the binary path being a pointer to the data section with the `/bin/sh` string we just wrote using the stager.
 
 ```python
 exploit =  p32(libc + LIBC_SYSTEM_OFFSET)   # system
